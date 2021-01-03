@@ -1,22 +1,24 @@
-/*
+/**
  * Primary file for API
  */
 
 // Dependencies
-const http = require('http');
-const https = require('https');
-const url = require('url');
-const fs = require('fs');
-const StringDecoder = require('string_decoder').StringDecoder;
-const config = require('./config.js');
+import http from'http';
+import https from'https';
+import url from'url';
+import fs from'fs';
+import { StringDecoder } from 'string_decoder';
+import config from'./lib/config.js';
+import handlers from'./lib/handlers.js';
+import helpers from'./lib/helpers.js';
 
 // Instantiate the HTTP server
-const httpServer = http.createServer((req, res) => {
+const httpServer = http.createServer( (req, res) => {
     unifiedServer(req, res);
 });
 
 // Start the HTTP server
-httpServer.listen(config.httpPort, () => {
+httpServer.listen(config.httpPort,  () => {
     console.log(`The server is listening on port ${config.httpPort} in ${config.envName} now`);
 });
 
@@ -25,17 +27,17 @@ const httpServerOptions = {
     'key': fs.readFileSync('./https/key.pem'),
     'cert': fs.readFileSync('./https/cert.pem')
 };
-const httpsServer = https.createServer(httpServerOptions, (req, res) => {
+const httpsServer = https.createServer(httpServerOptions,  (req, res) => {
     unifiedServer(req, res);
 });
 
 // Start the HTTPS server
-httpsServer.listen(config.httpsPort, () => {
-    console.log(`The HTTPS server is listening on port ${config.httpsPort} in ${config.envName} now`);
+httpsServer.listen(config.httpsPort,  () => {
+    console.log(`The server is listening on port ${config.httpsPort} in ${config.envName} now`);
 });
 
 // All the server logic for both the http and https servers
-const unifiedServer = (req, res) => {
+const unifiedServer =  (req, res) => {
     // Get the URL and parse it
     const parsedUrl = url.parse(req.url, true);
 
@@ -55,26 +57,27 @@ const unifiedServer = (req, res) => {
     // Get the payload, if any
     const decoder = new StringDecoder('utf-8');
     let buffer = '';
-    req.on('data', (data) => {
+    req.on('data',  (data) => {
         buffer += decoder.write(data);
     });
-    req.on('end', (data) => {
+    req.on('end',  (data) => {
         buffer += decoder.end();
+
+        console.log(data);
 
         // Choose the handler this request should go to
         const chosenHandler = typeof (router[trimmedPath]) !== 'undefined' ? router[trimmedPath] : handlers.notFound;
-
-        // Construct the data object to send to the handler
+        // construct the data object to send to the handler
         const dataObject = {
             'trimmedPath': trimmedPath,
             'headers': headers,
             'method': method,
-            'queryStringObject': queryStringObject,
-            'payload': buffer
+            'queryStringObject': helpers.parseJsonToObject(queryStringObject),
+            'payload': helpers.parseJsonToObject(buffer)
         };
 
         // Route the request to the handler specified in the router
-        chosenHandler(data, (statusCode, payload) => {
+        chosenHandler(dataObject,  (statusCode, payload) => {
 
             // Use the status code called back by the handler, or default
             statusCode = typeof (statusCode) == 'number' ? statusCode : 200;
@@ -96,28 +99,9 @@ const unifiedServer = (req, res) => {
     });
 };
 
-// Define the handlers
-const handlers = {};
-
-// Ping handler
-handlers.ping = (data, callback) => {
-    callback(200);
-};
-
-// Error handler
-handlers.notFound = (data, callback) => {
-    callback(404);
-};
-
-// Hello handler
-handlers.hello = (data, callback) => {
-    callback(200, {
-        'message': 'hello friend!'
-    });
-};
-
 // Define the routing
 const router = {
     '/ping': handlers.ping,
-    '/hello': handlers.hello
+    '/hello': handlers.hello,
+    '/users': handlers.users
 };
